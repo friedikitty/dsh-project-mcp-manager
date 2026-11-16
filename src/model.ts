@@ -371,12 +371,18 @@ export interface ProjectServerCatalogEntry {
  * 原始名在整个目录（全局行 + 所有项目行）中唯一时保持原名；否则该名的
  * 每个项目拥有者都改用 namespacedServerName（全局行参与占用判定但不改名）。
  * 已挂载的 Eager 名称优先保留，除非被宿主全局名称占用。
+ * `keepRawKeys` 中的项目（`projectKeyOf` 规范化后的项目根）在冲突时优先保留
+ * 原名：同一原始名有多个 keepRaw 拥有者时按 `keepRawKeys` 的先后第一个保留
+ * （即 `keepRawNamesFor` 的列表顺序），其余仍改名；被全局行占用的名字不会被
+ * 项目行复用。pin 优先于 retained：即使 pin 项目此前挂载的是 namespaced 名，
+ * 或其它项目已 retained 该原名，也以 pin 的裸名为准（可能触发对方重挂）。
  * 键 = projectKeyOf(projectRoot) + "\0" + 原始名。
  */
 export function effectiveServerNames(
   projects: ProjectServerCatalogEntry[],
   globalNames: string[] = [],
-  retained: ReadonlyMap<string, string> = new Map()
+  retained: ReadonlyMap<string, string> = new Map(),
+  keepRawKeys: Iterable<string> = []
 ): Map<string, string> {
   const counts = new Map<string, number>();
   const add = (name: string) => counts.set(name, (counts.get(name) ?? 0) + 1);
@@ -386,16 +392,44 @@ export function effectiveServerNames(
   }
   const result = new Map<string, string>();
   const used = new Set(globalNames);
+  const globalTaken = new Set(globalNames);
   const rows = projects.flatMap(({ projectRoot, names }) => names.map((name) => ({
     projectRoot, name, key: projectKeyOf(projectRoot) + "\0" + name
   })));
+  // keepRawNamesFor 的列表顺序即优先序；重复项只算第一次出现。
+  const keepRawRank = new Map<string, number>();
+  for (const key of keepRawKeys) {
+    if (!keepRawRank.has(key)) keepRawRank.set(key, keepRawRank.size);
+  }
+  // 先为 pinned 行预留裸名（全局行占用的名字除外），再处理 retained：
+  // 这样其它项目不能用 retained 把 pin 的裸名占住。
+  const reserved = new Map<string, string>(); // row key -> raw name
+  if (keepRawRank.size > 0) {
+    const preferred = new Map<string, { rowKey: string; rank: number }>();
+    for (const { projectRoot, name, key } of rows) {
+      const rank = keepRawRank.get(projectKeyOf(projectRoot));
+      if (rank === undefined || globalTaken.has(name)) continue;
+      const current = preferred.get(name);
+      if (current === undefined || rank < current.rank) preferred.set(name, { rowKey: key, rank });
+    }
+    for (const [name, { rowKey }] of preferred) {
+      reserved.set(rowKey, name);
+      used.add(name);
+    }
+  }
   for (const { key } of rows) {
+    if (reserved.has(key)) continue;
     const existing = retained.get(key);
     if (existing === undefined || used.has(existing)) continue;
     result.set(key, existing);
     used.add(existing);
   }
   for (const { projectRoot, name, key } of rows) {
+    const pinned = reserved.get(key);
+    if (pinned !== undefined) {
+      result.set(key, pinned);
+      continue;
+    }
     if (result.has(key)) continue;
     const prefixed = namespacedServerName(projectRoot, name);
     const preferred = (counts.get(name) ?? 0) > 1 || used.has(name) ? prefixed : name;

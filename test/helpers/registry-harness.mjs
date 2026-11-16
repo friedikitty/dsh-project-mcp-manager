@@ -135,7 +135,7 @@ export function fakeCtx() {
     effect(callback) {
       if (typeof callback === "function") disposers.push(callback);
     },
-    logger: { warn() {}, error() {}, info() {} },
+    logger: { warn() {}, error() {}, info() {}, debug() {} },
     tools: {
       schemas: () => schemas
     },

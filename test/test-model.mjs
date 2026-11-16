@@ -179,6 +179,46 @@ assert.equal(effCollision.get(keyOf(projC, "dup")), namespacedServerName(projC, 
 assert.deepEqual(effectiveServerNames(collisionCatalog), effCollision, "assignment is repeatable");
 pass("effectiveServerNames falls back to a hash suffix when a generated name collides");
 
+// 9d. keepRawNamesFor：pinned 项目保留原名，其余仍命名空间化；pin 优先于 retained
+const effKeep = effectiveServerNames(
+  [{ projectRoot: projA, names: ["dup"] }, { projectRoot: projB, names: ["dup"] }],
+  [],
+  new Map(),
+  [projectKeyOf(projA)]
+);
+assert.equal(effKeep.get(keyOf(projA, "dup")), "dup", "pinned project keeps the raw name");
+assert.equal(effKeep.get(keyOf(projB, "dup")), namespacedServerName(projB, "dup"), "the other owner is namespaced");
+// 全局行仍占用原名：pinned 项目不得复用
+const effKeepGlobal = effectiveServerNames([{ projectRoot: projA, names: ["shared"] }], ["shared"], new Map(), [projectKeyOf(projA)]);
+assert.equal(effKeepGlobal.get(keyOf(projA, "shared")), namespacedServerName(projA, "shared"), "host globals beat pin");
+// 两个 pinned 项目同名：按 keepRawNamesFor 列表顺序（不是 projects 顺序）第一个保留
+const effKeepOrder = effectiveServerNames(
+  [{ projectRoot: projA, names: ["both"] }, { projectRoot: projB, names: ["both"] }],
+  [],
+  new Map(),
+  [projectKeyOf(projB), projectKeyOf(projA)]
+);
+assert.equal(effKeepOrder.get(keyOf(projB, "both")), "both", "the first pinned owner wins");
+assert.equal(effKeepOrder.get(keyOf(projA, "both")), namespacedServerName(projA, "both"));
+// pin 优先于 retained：其它项目已 retained 裸名时也要让给 pinned 项目
+const effKeepRetained = effectiveServerNames(
+  [{ projectRoot: projA, names: ["dup"] }, { projectRoot: projB, names: ["dup"] }],
+  [],
+  new Map([[keyOf(projB, "dup"), "dup"]]),
+  [projectKeyOf(projA)]
+);
+assert.equal(effKeepRetained.get(keyOf(projA, "dup")), "dup", "pin beats another project's retained raw name");
+assert.equal(effKeepRetained.get(keyOf(projB, "dup")), namespacedServerName(projB, "dup"), "the retained owner is renamed");
+// pin 项目自己的 retained namespaced 名也让位给裸名（会触发一次重挂）
+const effKeepSelf = effectiveServerNames(
+  [{ projectRoot: projA, names: ["dup"] }, { projectRoot: projB, names: ["dup"] }],
+  [],
+  new Map([[keyOf(projA, "dup"), namespacedServerName(projA, "dup")]]),
+  [projectKeyOf(projA)]
+);
+assert.equal(effKeepSelf.get(keyOf(projA, "dup")), "dup", "pin replaces the project's retained namespaced name");
+pass("keepRawNamesFor pins raw names ahead of retained assignments");
+
 // 10. denySetFor：own 项目不 deny，无项目 deny 全部
 const mounted = [{ projectRoot: projA, effectiveNames: ["a1", "a2"] }, { projectRoot: projB, effectiveNames: ["b1"] }];
 assert.deepEqual(denySetFor(projA, mounted), ["b1"]);

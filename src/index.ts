@@ -11,6 +11,7 @@
  */
 import { Context } from "@deepseek-ai/cordis";
 import { MCP_PLUGIN_NAME } from "./mcp-file.js";
+import { projectKeyOf } from "./model.js";
 import { PROFILE_ENV } from "./dsh-paths.js";
 import { ProjectMcpRegistry, profileNameFromConfigPath } from "./registry.js";
 import { bindProjectMcpService, PROJECT_MCP_SERVICE } from "./service.js";
@@ -46,7 +47,12 @@ export const inject = ["tools", "agents"];
 /** 显式指定 profile 名的环境变量（实现在 dsh-paths.ts，registry 的校验共用）。 */
 export { PROFILE_ENV } from "./dsh-paths.js";
 
-export function apply(ctx: Context) {
+export function apply(ctx: Context, config?: unknown) {
+  const keepRawNamesFor = readKeepRawNamesFor(config);
+  if (keepRawNamesFor.length > 0) {
+    ctx.logger.debug(`项目 MCP：保留原始服务名的项目 ${keepRawNamesFor.join(", ")}`);
+  }
+
   const registry = new ProjectMcpRegistry(ctx as any, {
     /** 全局已装载 mcp-client 行的 serverName：从 loader include entry 的
      *  config.patches（dsh-app-boot 传入的已生效 patch 配置，含 bundle 层
@@ -74,6 +80,8 @@ export function apply(ctx: Context) {
         return [];
       }
     },
+    /** 生效名冲突时优先保留原名的项目（`keepRawNamesFor`，路径经 projectKeyOf 规范化）。 */
+    keepRawNameKeys: () => new Set(keepRawNamesFor.map(projectKeyOf)),
     /** 当前 profile 名：`DSH_MCP_PROFILE` 优先；否则从 loader 根 include 的
      *  config.path（`<dshHome>/profiles/<name>/cordis.yml`）解析，再退回
      *  `ctx.baseUrl`（同目录）。解析不出返回 undefined → 不读 profile 用户层。 */
@@ -99,4 +107,14 @@ export function apply(ctx: Context) {
   // 查询面经 cordis 服务暴露；registry 的装载/清理由其自身在构造时经
   // ctx.on / ctx.effect 注册，provide 同时钉住引用（fiber 卸载时注销服务）。
   ctx.provide(PROJECT_MCP_SERVICE, bindProjectMcpService(registry));
+}
+
+/** 读取 `keepRawNamesFor`（项目根列表）；非数组、非字符串项忽略，未配置返回空数组。 */
+function readKeepRawNamesFor(config: unknown): string[] {
+  const raw = (config as { keepRawNamesFor?: unknown } | undefined)?.keepRawNamesFor;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter((value) => value !== "");
 }
