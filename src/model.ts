@@ -365,22 +365,52 @@ export interface ProjectServerCatalogEntry {
  * 计算全部 (projectRoot, 原始名) → 生效名的映射：
  * 原始名在整个目录（全局行 + 所有项目行）中唯一时保持原名；否则该名的
  * 每个项目拥有者都改用 namespacedServerName（全局行参与占用判定但不改名）。
+ * `keepRawKeys` 中的项目（`projectKeyOf` 规范化后的项目根）在冲突时优先保留
+ * 原名：同一原始名有多个 keepRaw 拥有者时按 `keepRawKeys` 的先后第一个保留
+ * （即 `keepRawNamesFor` 的列表顺序），其余仍改名；被全局行占用的名字不会被
+ * 项目行复用。
  * 键 = projectKeyOf(projectRoot) + "\0" + 原始名。
  */
 export function effectiveServerNames(
   projects: ProjectServerCatalogEntry[],
-  globalNames: string[] = []
+  globalNames: string[] = [],
+  keepRawKeys: Iterable<string> = []
 ): Map<string, string> {
+  const globalTaken = new Set(globalNames);
+  // keepRawNamesFor 的列表顺序即优先序；重复项只算第一次出现。
+  const keepRawRank = new Map<string, number>();
+  for (const key of keepRawKeys) {
+    if (!keepRawRank.has(key)) keepRawRank.set(key, keepRawRank.size);
+  }
   const counts = new Map<string, number>();
   const add = (name: string) => counts.set(name, (counts.get(name) ?? 0) + 1);
   for (const name of globalNames) add(name);
   for (const project of projects) {
     for (const name of project.names) add(name);
   }
+  // 冲突时保留原名的拥有者：每个名字记 keepRawNamesFor 里最靠前的项目。
+  const preferredOwner = new Map<string, { key: string; rank: number }>();
+  for (const project of projects) {
+    const key = projectKeyOf(project.projectRoot);
+    const rank = keepRawRank.get(key);
+    if (rank === undefined) continue;
+    for (const name of project.names) {
+      const current = preferredOwner.get(name);
+      if (current === undefined || rank < current.rank) preferredOwner.set(name, { key, rank });
+    }
+  }
   const result = new Map<string, string>();
   for (const project of projects) {
+    const key = projectKeyOf(project.projectRoot);
     for (const name of project.names) {
-      result.set(projectKeyOf(project.projectRoot) + "\0" + name, (counts.get(name) ?? 0) > 1 ? namespacedServerName(project.projectRoot, name) : name);
+      const collides = (counts.get(name) ?? 0) > 1;
+      if (!collides) {
+        result.set(key + "\0" + name, name);
+      } else if (!globalTaken.has(name) && preferredOwner.get(name)?.key === key) {
+        result.set(key + "\0" + name, name);
+      } else {
+        result.set(key + "\0" + name, namespacedServerName(project.projectRoot, name));
+      }
     }
   }
   return result;

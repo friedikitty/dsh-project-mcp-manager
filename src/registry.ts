@@ -198,6 +198,10 @@ export interface ProjectFileState {
 export interface ProjectMcpRegistryOptions {
   /** 全局（profile patch）已装载 mcp-client 行的 serverName，用于生效名冲突判定。 */
   globalNames: () => Promise<string[]>;
+  /** 生效名冲突时优先保留原名的项目键（`projectKeyOf` 规范化后的项目根）。
+   *  同一原始名有多个命中时按 catalog 顺序第一个保留原名，其余仍命名空间化；
+   *  全局行占用的名字不会被项目行复用。缺省空集 = 全部按旧规则改名。 */
+  keepRawNameKeys?: () => Iterable<string>;
   /** 当前运行的 profile 名（决定读哪个 `profiles/<name>/mcp.json`）；解析不出返回 undefined。 */
   activeProfile?: () => Promise<string | undefined>;
   /** 用户层路径注入点（测试用）；缺省 `<dshHome>/mcp.yml`、`<dshHome>/mcp.json`、`<dshHome>/profiles`
@@ -1751,7 +1755,8 @@ export class ProjectMcpRegistry {
       names: entry.rows.map((row) => row.rawName)
     }));
     const globalNames = [...hostGlobalNames, ...globalMerged.rows.map((row) => row.rawName)];
-    this.effective = effectiveServerNames(catalogProjects, globalNames);
+    const keepRawKeys = new Set(this.providers.keepRawNameKeys?.() ?? []);
+    this.effective = effectiveServerNames(catalogProjects, globalNames, keepRawKeys);
 
     const live = await this.liveMountKeys();
     this.touchIdleSince(live);

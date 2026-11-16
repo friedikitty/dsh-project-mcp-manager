@@ -137,6 +137,27 @@ const eff2 = effectiveServerNames([{ projectRoot: projA, names: ["conflict"] }],
 assert.equal(eff2.get(projectKeyOf(projA) + "\u0000conflict"), namespacedServerName(projA, "conflict"));
 pass("effectiveServerNames renames only conflicting names deterministically");
 
+// 8b. keepRawNamesFor：pin 的项目在冲突时保留原名，其余仍命名空间化
+const eff3 = effectiveServerNames(
+  [{ projectRoot: projA, names: ["dup"] }, { projectRoot: projB, names: ["dup"] }],
+  [],
+  [projectKeyOf(projA)]
+);
+assert.equal(eff3.get(projectKeyOf(projA) + "\u0000dup"), "dup");
+assert.equal(eff3.get(projectKeyOf(projB) + "\u0000dup"), namespacedServerName(projB, "dup"));
+// 全局行仍占用原名：pinned 项目不得复用
+const eff4 = effectiveServerNames([{ projectRoot: projA, names: ["shared"] }], ["shared"], [projectKeyOf(projA)]);
+assert.equal(eff4.get(projectKeyOf(projA) + "\u0000shared"), namespacedServerName(projA, "shared"));
+// 两个 pinned 项目同名：按 keepRawNamesFor 列表顺序（不是 projects 顺序）第一个保留原名
+const eff5 = effectiveServerNames(
+  [{ projectRoot: projA, names: ["both"] }, { projectRoot: projB, names: ["both"] }],
+  [],
+  [projectKeyOf(projB), projectKeyOf(projA)]
+);
+assert.equal(eff5.get(projectKeyOf(projB) + "\u0000both"), "both");
+assert.equal(eff5.get(projectKeyOf(projA) + "\u0000both"), namespacedServerName(projA, "both"));
+pass("keepRawNamesFor keeps the first pinned project's names");
+
 // 9. namespacedServerName 合法且确定性
 const ns = namespacedServerName(projA, "dup");
 assert.match(ns, SERVER_NAME_RE);
