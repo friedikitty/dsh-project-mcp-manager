@@ -57,7 +57,11 @@ English | [中文](how-it-works.zh.md)
   renamed. Model-visible tool names are built from
   the **effective** server name and the MCP tool's own name
   (`mcp__<effectiveServerName>__<toolName>`), which may differ from the
-  `serverName` written in the file.
+  `serverName` written in the file. Loader config `keepRawNamesFor` pins
+  selected project roots to their raw names on a conflict; the first listed
+  owner wins, global names stay unavailable, and the pin takes precedence over
+  mount-history retention (a workspace that already held the raw name is
+  renamed and may remount).
 - **Session visibility**: when an agent is created, its session cwd resolves to
   a project, and `tools.restrict({ deny })` is applied to that agent to deny
   every project server except those of the session's own project, plus the

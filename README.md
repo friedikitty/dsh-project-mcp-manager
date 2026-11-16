@@ -38,6 +38,25 @@ official profile HMR. **Transport types are decided by the official client.**
 | v0.7.x – v0.8.x | `0.2.0` line, from `0.2.0-rc.2` |
 | v0.6.0 | `0.1.5` |
 
+### Keeping a project's raw server names
+
+When several checkouts declare the same `serverName`, the effective-name rules
+namespace every project row. To keep `mcp__<serverName>__<tool>` stable in the
+checkout you work in, pin its root in the loader config:
+
+```yaml
+# ~/.dsh/profiles/<name>/cordis.patch.yml
+- id: mcp-project
+  config:
+    keepRawNamesFor:
+      - T:/work/my-main-checkout
+```
+
+The first listed owner of a conflicting name keeps it; other owners still get
+`p<hash>_`, and a name occupied by a global row is never reused. Pinning wins
+over mount-history retention, so a workspace that already held the raw name is
+renamed (and may remount). Unconfigured behavior is unchanged.
+
 If this plugin is useful, a GitHub
 [star](https://github.com/wldxiaobai/dsh-project-mcp-manager) is appreciated.
 Bugs, host mismatches, or ideas belong in

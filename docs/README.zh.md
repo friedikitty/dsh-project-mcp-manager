@@ -33,6 +33,24 @@ client 决定。**
 | v0.7.x – v0.8.x | `0.2.0` 线，从 `0.2.0-rc.2` 起 |
 | v0.6.0 | `0.1.5` |
 
+### 保留项目的原始服务名
+
+多个 checkout 声明同一个 `serverName` 时，生效名规则会给每个项目行加命名空间。
+要让常用 checkout 的 `mcp__<serverName>__<tool>` 保持稳定，可在装载器配置里 pin
+它的项目根：
+
+```yaml
+# ~/.dsh/profiles/<name>/cordis.patch.yml
+- id: mcp-project
+  config:
+    keepRawNamesFor:
+      - T:/work/my-main-checkout
+```
+
+冲突时按配置列表顺序第一个拥有者保留原名，其余仍用 `p<hash>_`，被全局行占用的
+名字不复用。pin 优先于挂载历史保留：已经占着原名的其它工作区会被改名（可能重挂）。
+未配置时行为不变。
+
 若这个插件对你有帮助，欢迎给仓库点一颗
 [star](https://github.com/wldxiaobai/dsh-project-mcp-manager)。遇到问题、宿主
 不适配或有想法，请开

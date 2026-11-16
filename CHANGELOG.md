@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`keepRawNamesFor` loader config.** A project root listed here keeps its
+  raw `serverName` values in `mcp__<serverName>__<tool>` when other workspaces
+  declare the same names. The first listed project wins; other owners still get
+  `p<hash>_`, and names occupied by a global row are never reused. Pinning
+  outranks mount-history retention, so a workspace that already held the raw
+  name is renamed (and may remount). Unconfigured behavior is unchanged.
+
 ## [0.13.0] - 2026-11-12
 
 Versioned together with `dsh-project-mcp-ui` 0.13.0. This source version and
