@@ -7,7 +7,7 @@ import { ProjectMcpRegistry, parseDiagDocument, planProjectChanges, projectMcpFi
 import { bindProjectMcpService, PROJECT_MCP_SERVICE } from "../lib/service.js";
 import { apply, PROJECT_MCP_UPDATED_EVENT } from "../lib/index.js";
 import { MCP_BLOCK_BEGIN, MCP_BLOCK_END, extractManagedRows, writeManagedRows } from "../lib/mcp-file.js";
-import { byCodeUnit } from "../lib/model.js";
+import { byCodeUnit, namespacedServerName } from "../lib/model.js";
 import { projectDiagFile } from "../lib/dsh-paths.js";
 
 let passed = 0;
@@ -104,7 +104,7 @@ function fakeCtx() {
     effect(callback) {
       if (typeof callback === "function") disposers.push(callback);
     },
-    logger: { warn() {}, error() {}, info() {} },
+    logger: { warn() {}, error() {}, info() {}, debug() {} },
     tools: {
       schemas: () => schemas
     },
@@ -1649,6 +1649,51 @@ try {
   }
   await rmRetry(dirSvc);
   pass("projectMcp service matches registry queries and apply provides it");
+}
+
+// apply 读取 keepRawNamesFor：同名冲突时 pin 的项目保留原名，另一个项目仍命名空间化。
+{
+  const dirKeep = await mkdtemp(join(tmpdir(), "dsh-mcp-keepraw-"));
+  const homeKeep = join(dirKeep, "home");
+  const projKeepA = join(dirKeep, "projA");
+  const projKeepB = join(dirKeep, "projB");
+  await mkdir(join(homeKeep, ".dsh"), { recursive: true });
+  await writeManagedRows(projectMcpFile(projKeepA), [stdioRow("shared")], { createIfMissing: true });
+  await writeManagedRows(projectMcpFile(projKeepB), [stdioRow("shared", "python")], { createIfMissing: true });
+  const savedHome = process.env.DSH_HOME;
+  const savedProfile = process.env.DSH_MCP_PROFILE;
+  const savedCwd = process.cwd();
+  try {
+    process.env.DSH_HOME = homeKeep;
+    delete process.env.DSH_MCP_PROFILE;
+    process.chdir(projKeepA);
+    const ctxKeep = fakeCtx();
+    ctxKeep.agentsList.push(fakeAgent("session-keep-a", projKeepA), fakeAgent("session-keep-b", projKeepB));
+    apply(ctxKeep, { keepRawNamesFor: [projKeepA] });
+    const serviceKeep = ctxKeep.provided[PROJECT_MCP_SERVICE];
+    assert.ok(serviceKeep, "apply provides projectMcp with keepRawNamesFor");
+    await serviceKeep.reload();
+    const viewKeepA = await serviceKeep.serverView(projKeepA, "shared");
+    const viewKeepB = await serviceKeep.serverView(projKeepB, "shared");
+    assert.equal(viewKeepA?.effectiveServerName, "shared", "pinned project keeps the raw name");
+    assert.equal(
+      viewKeepB?.effectiveServerName,
+      namespacedServerName(projKeepB, "shared"),
+      "the other project still gets the namespaced name"
+    );
+    for (const disposer of ctxKeep.disposers) {
+      const cleanup = disposer();
+      if (typeof cleanup === "function") cleanup();
+    }
+    pass("apply passes keepRawNamesFor through to effective names");
+  } finally {
+    process.chdir(savedCwd);
+    if (savedHome === undefined) delete process.env.DSH_HOME;
+    else process.env.DSH_HOME = savedHome;
+    if (savedProfile === undefined) delete process.env.DSH_MCP_PROFILE;
+    else process.env.DSH_MCP_PROFILE = savedProfile;
+  }
+  await rmRetry(dirKeep);
 }
 
 // 受管 yml 编辑：启停 / 删除 / 工具开关只写该作用域的受管块；其它来源落占位或拷贝。
