@@ -42,7 +42,7 @@ npx tsc --noEmit       # 仅类型检查
 
 ## 关键行为约定（改动前必读）
 
-- **生效名 vs 原名**：装载与工具隔离一律用 effectiveServerName（可能与文件里写的 serverName 不同）；模型提示里的工具名为 `mcp__<生效名>__<tool>`。**只有项目行会改名**（`p<hash>_`），全局用户层行保持原名。
+- **生效名 vs 原名**：装载与工具隔离一律用 effectiveServerName（可能与文件里写的 serverName 不同）；模型提示里的工具名为 `mcp__<生效名>__<tool>`。**只有项目行会改名**（`p<hash>_`），全局用户层行保持原名。装载器配置 `keepRawNamesFor`（项目根列表）可让指定项目在冲突时保留原名，按列表顺序第一个拥有者生效。
 - **全局 vs 项目**：用户层（profile json / 用户 yml / 用户 json）宿主级只挂一条，与项目数无关、不参与按项目的 deny；项目层按需挂载（有会话或进程 cwd），经 `tools.restrict({ deny })` 隔离。项目行遮蔽全局行时，只对该项目的会话 deny 全局工具（项目侧压制），全局实例不卸载。
 - **会话隔离**：deny 传的是**精确工具名**（tools.restrict 对 unknown names 报错），必须先把 serverName 展开成当前注册的工具名再 deny；装载未 settle 时会失败，靠下一次 sweep 补上——不要改成一次性应用。条目 `tools.allow`/`tools.deny`（JSON 亦映射 `includeTools`/`excludeTools`）同样只展开已注册名，glob 匹配，deny 优先，且在 `toOfficialConfig` 时剥掉以免传给 client。
 - **查询面推送**：对账成功结束 emit `projectMcp/updated`（无载荷，不带 diff）。装载 fiber 若在这次对账结束之后才变成 active/failed，再发一次，否则页面会停在「正在启动」。`snapshot` / `serverView` / `globalState` 不发该事件。配套 UI 监听后自读 `snapshot()` 再 diff；浏览器 SSE 仍由 UI 包自建。监听方抛错只记 warn，不让对账失败。

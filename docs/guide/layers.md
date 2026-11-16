@@ -88,6 +88,14 @@ project row is renamed to `p<hash>_<name>` per the effective-name rules while
 the global row keeps its original name; that project's sessions also deny the
 global row's tools (project-side suppression).
 
+### Keeping a project's raw names
+
+When several checkouts declare the same `serverName`, the loader config accepts
+`keepRawNamesFor` — a list of project roots whose rows keep their original
+names on a conflict. The first listed owner of a name keeps it; other owners
+retain the `p<hash>_` form, and a name occupied by a global row is never
+reused. Example in the README.
+
 ## Legacy Claude Code layer (read-only)
 
 - `<projectRoot>/.mcp.json` is still read (layer 3, lowest project priority),

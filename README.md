@@ -243,13 +243,35 @@ pnpm test          # node test/*.mjs (loader, CLI, and settings-page helpers)
   determination but are never renamed. Model-visible tool names are built from
   the **effective** server name and the MCP tool's own name
   (`mcp__<effectiveServerName>__<toolName>`), which may differ from the
-  `serverName` written in the file.
+  `serverName` written in the file. The optional `keepRawNamesFor` loader
+  config lists project roots that keep their original names on a conflict (see
+  below).
 - **Session visibility**: when an agent is created, its session cwd resolves to
   a project, and `tools.restrict({ deny })` is applied to that agent to deny
   every project server except those of the session's own project, plus the
   global servers suppressed by the project's own rows; a session without a cwd
   falls back to the owner project (subagents), then to the project containing
   the dsh process cwd. Released when the session is destroyed.
+
+### Keeping a project's raw server names
+
+When several checkouts on one machine declare the same `serverName`, the
+effective-name rules rename every project row, so the checkout you are working
+in loses its plain tool names. Pin the project's own servers when you need
+`mcp__<serverName>__<tool>` to stay stable:
+
+```yaml
+# ~/.dsh/profiles/<name>/cordis.patch.yml
+- id: mcp-project
+  config:
+    keepRawNamesFor:
+      - T:/work/my-main-checkout
+```
+
+`keepRawNamesFor` takes project roots (the directory containing `.git`). On a
+conflict the first listed owner of a name keeps it, every other owner still
+gets the `p<hash>_` form, and a name already taken by a global row is never
+reused by a pinned project. Names that are unique stay unchanged either way.
 
 ## Query surface
 

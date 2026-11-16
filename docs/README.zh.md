@@ -198,7 +198,9 @@ pnpm test          # node 直跑 test/ 下的 .mjs（装载器、CLI 与设置�
   确定性、与装载顺序无关），避免 `dsh-mcp-client` 按进程根的 serverName
   预留冲突。全局行（profile patch 行与用户层行）参与占用判定但不改名。模型可见
   的工具名由生效服务器名与 MCP 工具自身的名字拼成 `mcp__<生效名>__<工具名>`，
-  与文件里写的 `serverName` 可能不同。
+  与文件里写的 `serverName` 可能不同。可选装载器配置 `keepRawNamesFor` 列出
+  必须保留原名的项目根：冲突时按列表顺序第一个拥有者保留原名，其余仍改名，
+  被全局行占用的名字不复用（示例见英文 README）。
 - **会话可见性**：agent 创建时按其会话 cwd 解析项目，对该 agent 应用
   `tools.restrict({ deny })`，deny 掉除本会话项目外的全部项目服务器，以及本项目
   自身行压制过的全局服务器；会话无 cwd 时回退 owner 项目（子代理），再回退 dsh
