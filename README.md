@@ -262,6 +262,8 @@ Feature documentation lives in `docs/`, English and Chinese side by side:
 - [Query surface](docs/guide/service.md) — `ctx.projectMcp`, `contextCost` /
   `resultCost`, the `projectMcp/updated` event, exported view types, and the
   semver contract for the companion UI.
+- [Remote setup](SETUP.md) — install dsh, dsh-tui, and this fork's GitHub
+  packages on a fresh machine.
 
 Design, release, code review, and testing records: [records](docs/records.md).
 
