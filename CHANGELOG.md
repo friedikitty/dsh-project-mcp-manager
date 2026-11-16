@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`keepRawNamesFor` loader config.** A project root listed here keeps its
+  raw `serverName` values in `mcp__<serverName>__<tool>` when another checkout
+  declares the same names. The first project listed for a name wins; other
+  owners still get `p<hash>_`, and names already occupied by a global row are
+  never reused. Unconfigured behavior is unchanged.
+
 ## [0.10.0] - 2026-11-04
 
 Versioned together with `dsh-project-mcp-ui` 0.10.0. This source version and
